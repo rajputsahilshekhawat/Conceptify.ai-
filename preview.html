@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConceptifyAI Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">ConceptifyAI</h1>
+        <p class="text-center text-gray-500 mb-6">The "Explain it to me like I'm 5" Engine</p>
+
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md mb-6">
+            <h2 class="text-lg font-semibold text-gray-800">Prompt:</h2>
+            <p id="prompt" class="text-gray-700 mt-1">Explain the Pythagorean Theorem.</p>
+        </div>
+
+        <div>
+            <label for="student-answer" class="block text-sm font-medium text-gray-700 mb-2">Your Explanation:</label>
+            <textarea id="student-answer" rows="6" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Explain the concept in your own words..."></textarea>
+        </div>
+
+        <div class="mt-6 text-center">
+            <button id="submit-btn" class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 transform hover:scale-105">
+                Analyze My Explanation
+            </button>
+        </div>
+
+        <div id="feedback-container" class="mt-8 hidden">
+             <div id="loading-spinner" class="flex justify-center items-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="ml-3 text-gray-600">Analyzing...</p>
+            </div>
+            <div id="feedback-content" class="hidden">
+                <h3 class="text-xl font-semibold text-gray-800 mb-3">Feedback:</h3>
+                <div id="ai-feedback" class="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-700 whitespace-pre-wrap"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const submitBtn = document.getElementById('submit-btn');
+        const studentAnswer = document.getElementById('student-answer');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const aiFeedback = document.getElementById('ai-feedback');
+        const promptText = document.getElementById('prompt').textContent;
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const feedbackContent = document.getElementById('feedback-content');
+
+
+        submitBtn.addEventListener('click', async () => {
+            const answer = studentAnswer.value;
+            if (!answer.trim()) {
+                alert("Please provide an explanation.");
+                return;
+            }
+
+            feedbackContainer.classList.remove('hidden');
+            loadingSpinner.classList.remove('hidden');
+            feedbackContent.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const aiPrompt = `
+                You are an expert physics teacher. A student has tried to explain the Pythagorean Theorem. Their explanation is: "${answer}".
+                Analyze this explanation based on the following criteria:
+                1. Correctness of the core relationship (a^2 + b^2 = c^2).
+                2. Mention of 'right-angled triangle'.
+                3. Correct identification of 'c' as the hypotenuse.
+                4. Clarity of the explanation.
+                Provide simple, constructive feedback for the student to improve their understanding. Keep the feedback encouraging and format it nicely with bullet points for strengths and areas for improvement. Start with an encouraging opening sentence.
+            `;
+
+            try {
+                const feedback = await getAIAssessment(aiPrompt);
+                aiFeedback.textContent = feedback;
+            } catch (error) {
+                aiFeedback.textContent = "Sorry, something went wrong while analyzing your answer. Please try again.";
+                console.error("Error fetching AI feedback:", error);
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                feedbackContent.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+        
+        async function getAIAssessment(prompt) {
+            // This function simulates a call to a backend that would use the Gemini API
+            // For this hackathon prototype, we will make a direct call
+             let chatHistory = [];
+             chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+             const payload = { contents: chatHistory };
+             const apiKey = "" // API Key is not needed for gemini-2.5-flash-preview-05-20
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+             try {
+                const response = await fetch(apiUrl, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+                
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                } else {
+                     // In case of an unexpected response structure, provide a default message.
+                    return "Could not get a valid response from the AI. The response might be empty or malformed.";
+                }
+
+             } catch (error) {
+                console.error("Error during API call:", error);
+                return `An error occurred while trying to get feedback from the AI: ${error.message}`;
+             }
+        }
+
+    </script>
+</body>
+</html>
